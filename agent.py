@@ -1,10 +1,13 @@
-
-import os, time, datetime, itertools
+import os, time, itertools, datetime
 import zmq
 
 from multiprocessing import Process, Queue, current_process
 
-from utils import *
+def get_current_time() :
+    return datetime.datetime.now().strftime("%Y/%m/%d_%H:%M:%S.%f")
+
+def get_datetime_stamp() :
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 def get_one_item_in_queue(q, max_num_items = 10) :
     item = None

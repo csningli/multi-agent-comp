@@ -5,7 +5,7 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "multi-agent-comp"
+name = "mulac"
 version = "0.1.0"
 description = "A simple way to distribute the computing work among a group of process-independent (or thread-independent) agents."
 readme = "README.md"
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-keywords = ["agent", ]
+keywords = []
 dependencies = [
     'pyzmq >= 22.3.0', 
 ]
@@ -24,5 +24,5 @@ dependencies = [
 requires-python = ">=3.7.11"
 
 [project.urls]
-Homepage = "https://github.com/csningli/multi-agent-comp"
+Homepage = "https://github.com/csningli/mulac"
 

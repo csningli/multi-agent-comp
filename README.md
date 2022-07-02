@@ -1,7 +1,11 @@
-# Multi-Agent-Comp (Multiagent Computing Framework) 
+# mulac (Multiagent Computing Framework) 
 
-A simple way to distribute the computing work among a group of process-independent (or thread-independent) agents.
+A simple way to distribute the computing work among a group of process-independent (or thread-independent) agents. 
 
-## Usage of multi-agent-comp
+## Project Homepage 
+
+You can find the source code in https://github.com/csningli/mulac .
+
+## Usage
 
 You can refer to https://github.com/csningli/multi-agent-comp-examples for more examples of using multi-agent-comp.

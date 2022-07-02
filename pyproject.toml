@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mulac"
-version = "0.1.0"
+version = "0.1.1"
 description = "A simple way to distribute the computing work among a group of process-independent (or thread-independent) agents."
 readme = "README.md"
 authors = [{ name = "NiL", email = "csningli@qq.com" }]
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
 ]
-keywords = []
+keywords = ['mulac', ]
 dependencies = [
     'pyzmq >= 22.3.0', 
 ]

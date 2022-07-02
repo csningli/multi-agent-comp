@@ -4,7 +4,7 @@ A simple way to distribute the computing work among a group of process-independe
 
 ## Project Homepage 
 
-You can find the source code in https://github.com/csningli/mulac .
+You can find the source code in https://github.com/csningli/multi-agent-comp .
 
 ## Usage
 

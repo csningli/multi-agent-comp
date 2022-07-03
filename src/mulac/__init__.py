@@ -1,4 +1,4 @@
-import os, time, itertools, datetime
+import os, time, itertools, datetime, queue
 
 import zmq
 
@@ -59,9 +59,9 @@ def msg_to_raw(msg) :
     return "%s/%s/%s/%s" % (msg.src, msg.dest, msg.topic, msg.content)
 
 class Logger(object) :
-    def __init__(self, path) :
+    def __init__(self, path = None) :
         self.path = path
-        self.clear()
+        self.logs = []
 
     def info(self) :
         return f"<<MCF.{type(self).__name__} path = {self.path}, len_logs = {len(self.logs)}>>"
@@ -69,18 +69,20 @@ class Logger(object) :
     def log(self, line) :
         self.logs.append("[%s] %s" % (get_current_time(), line))
 
-    def clear(self) :
-        self.logs = []
-
     def dump(self) :
-        with open(self.path, 'a') as f :
-            f.writelines([line + "\n" for line in self.logs])
-        self.clear()
+        if len(self.logs) > 0 :
+            if self.path is not None and os.path.isfile(self.path) :
+                with open(self.path, 'a') as f :
+                    f.writelines([line + "\n" for line in self.logs])
+            else :
+                for line in self.logs :
+                    print(line)
+            self.logs = []
 
 class Agent(object) :
-    def __init__(self, id) :
+    def __init__(self, id, path = None) :
         self.id = str(id)
-        self.logger = Logger(path = "logs/%s-agent_%s.log" % (get_datetime_stamp(), self.id))
+        self.logger = Logger(path = path)
 
     def info(self) :
         return f"<<MCF.{type(self).__name__} id = {self.id}>>"
@@ -231,9 +233,9 @@ def run_agent(agent, in_queue, out_queue, timeout = 60) :
         agent.logger.dump()
 
 class Monitor(object) :
-    def __init__(self) :
+    def __init__(self, path = None) :
         self.running = False
-        self.logger = Logger(path = "logs/%s-monitor.log" % get_datetime_stamp())
+        self.logger = Logger(path = path)
 
     def info(self) :
         return f"<<MCF.{type(self).__name__}>>"

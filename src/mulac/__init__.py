@@ -1,8 +1,6 @@
-import os, time, itertools, datetime, queue
 
-import zmq
-
-from multiprocessing import Process, Queue, current_process
+import os, time, itertools, datetime
+import queue, multiprocessing, threading, zmq
 
 def get_current_time() :
     return datetime.datetime.now().strftime("%Y/%m/%d_%H:%M:%S.%f")
@@ -48,7 +46,7 @@ class Message(object) :
         self.content = content
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} src = {self.src}, dest = {self.dest}, topic = {self.topic}, content = {self.content}>>"
+        return f"<<mulac.{type(self).__name__} src = {self.src}, dest = {self.dest}, topic = {self.topic}, content = {self.content}>>"
 
 def raw_to_msg(raw) :
     src, dest, topic = raw.split('/')[0:3]
@@ -64,7 +62,7 @@ class Logger(object) :
         self.logs = []
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} path = {self.path}, len_logs = {len(self.logs)}>>"
+        return f"<<mulac.{type(self).__name__} path = {self.path}, len_logs = {len(self.logs)}>>"
 
     def log(self, line) :
         self.logs.append("[%s] %s" % (get_current_time(), line))
@@ -85,7 +83,7 @@ class Agent(object) :
         self.logger = Logger(path = path)
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} id = {self.id}>>"
+        return f"<<mulac.{type(self).__name__} id = {self.id}>>"
 
     def process(self, msgs) :
         result = {"msgs" : []}
@@ -102,7 +100,7 @@ class Backbone(object) :
                         nbs = node.get("nbs", []), group = node.get("group", []))
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} num_nodes = {len(self.nodes)}>>"
+        return f"<<mulac.{type(self).__name__} num_nodes = {len(self.nodes)}>>"
 
     def add_node(self, in_id, in_end, out_id, out_end, nbs, group = None) :
         self.nodes[in_id] = {"in_end" : str(in_end), "out_id" : str(out_id), "out_end" : out_end,
@@ -138,7 +136,7 @@ class PubAgent(Agent) :
         self.buffer = []
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} pub = {self.pub}>>"
+        return f"<<mulac.{type(self).__name__} pub = {self.pub}>>"
 
     def process(self, msgs) :
         result = {"msgs" : []}
@@ -182,7 +180,7 @@ class SubAgent(Agent) :
                 self.subs.append(node["out_end"])
 
     def info(self) :
-        return f"<<MCF.{type(self).__name__} subs = {self.subs}>>"
+        return f"<<mulac.{type(self).__name__} subs = {self.subs}>>"
 
     def process(self, msgs) :
         result = {"msgs" : []}
@@ -233,23 +231,25 @@ def run_agent(agent, in_queue, out_queue, timeout = 60) :
         agent.logger.dump()
 
 class Monitor(object) :
-    def __init__(self, path = None) :
-        self.running = False
+    def __init__(self, akls, qkls, path = None) :
+        self.akls = akls
+        self.qkls = qkls
         self.logger = Logger(path = path)
+        self.running = False
 
     def info(self) :
         return f"<<MCF.{type(self).__name__}>>"
 
     def run(self, agents, timeout = 60) :
-        in_queues = {agent.id : Queue() for agent in agents}
-        out_queues = {agent.id : Queue() for agent in agents}
+        in_queues = {agent.id : self.qkls() for agent in agents}
+        out_queues = {agent.id : self.qkls() for agent in agents}
 
-        agent_pool = {agent.id : Process(target = run_agent, kwargs = {
+        agent_pool = {agent.id : self.akls(target = run_agent, kwargs = {
             "agent" : agent, "in_queue": in_queues[agent.id], "out_queue" : out_queues[agent.id],
             "timeout" : timeout}) for agent in agents}
 
-        for process in agent_pool.values() :
-            process.start()
+        for agent in agent_pool.values() :
+            agent.start()
 
         start_time = time.time()
         finish_time = None
@@ -268,7 +268,18 @@ class Monitor(object) :
 
         self.logger.dump()
         finish_time = time.time() if finish_time is None else finish_time
-        for process in agent_pool.values() :
-            process.terminate()
-            process.join()
+        for agent in agent_pool.values() :
+            if hasattr(agent, 'terminate') :
+                agent.terminate()
+            agent.join()
         return finish_time - start_time
+
+class ProcessMonitor(Monitor) :
+    def __init__(self, path = None) :
+        super(ProcessMonitor, self).__init__(akls = multiprocessing.Process,
+                                             qkls = multiprocessing.Queue, path = path)
+
+class ThreadMonitor(Monitor) :
+    def __init__(self, path = None) :
+        super(ThreadMonitor, self).__init__(akls = threading.Thread,
+                                            qkls = queue.Queue, path = path)

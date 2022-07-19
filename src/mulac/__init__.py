@@ -78,9 +78,8 @@ class Logger(object) :
             self.logs = []
 
 class Agent(object) :
-    def __init__(self, id, path = None) :
+    def __init__(self, id) :
         self.id = str(id)
-        self.logger = Logger(path = path)
 
     def info(self) :
         return f"<<mulac.{type(self).__name__} id = {self.id}>>"
@@ -258,15 +257,18 @@ class Monitor(object) :
                 msg = get_one_item_in_queue(out_queue)
                 if msg is not None :
                     if msg.dest is None :
-                        timeout = 0
-                        self.logger.log("monitor done.")
+                        if msg.content is None :
+                            timeout = 0
+                            self.logger.log("monitor done.")
+                        elif msg.topic == 'log' :
+                            self.logger.log('[log from %s] %s' % (msg.src, msg.content))
                     elif msg.dest == "" :
                         for dest in [agent.id for agent in agents if agent.id != msg.src] :
                             put_one_item_to_queue(in_queues[dest], msg)
                     else :
                         put_one_item_to_queue(in_queues[msg.dest], msg)
 
-        self.logger.dump()
+            self.logger.dump()
         finish_time = time.time() if finish_time is None else finish_time
         for agent in agent_pool.values() :
             if hasattr(agent, 'terminate') :

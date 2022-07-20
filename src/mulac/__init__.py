@@ -260,8 +260,8 @@ class Monitor(object) :
                         if msg.content is None :
                             timeout = 0
                             self.logger.log("monitor done.")
-                        elif msg.topic == 'log' :
-                            self.logger.log('[log from %s] %s' % (msg.src, msg.content))
+                        else :
+                            self.handle_msg(msg = msg)
                     elif msg.dest == "" :
                         for dest in [agent.id for agent in agents if agent.id != msg.src] :
                             put_one_item_to_queue(in_queues[dest], msg)
@@ -275,6 +275,11 @@ class Monitor(object) :
                 agent.terminate()
             agent.join()
         return finish_time - start_time
+
+    def handle_msg(self, msg) :
+        if msg.topic == 'log' :
+            self.logger.log('[log from %s] %s' % (msg.src, msg.content))
+
 
 class ProcessMonitor(Monitor) :
     def __init__(self, path = None) :

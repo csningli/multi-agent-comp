@@ -1,5 +1,5 @@
 
-import os, time, itertools, datetime
+import os, time, itertools, datetime, functools
 import queue, multiprocessing, threading, zmq
 
 def get_current_time() :
@@ -97,39 +97,59 @@ def run_agent(agent, in_queue, out_queue, timeout = 60) :
         if len(out_msgs) > 0 :
             put_items_to_queue(out_queue, items = out_msgs)
 
-def run_pub(address, in_queue, out_queue, timeout = 60) :
+class Publisher(object) :
+    def __init__(self, address) :
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.PUB)
+        self.socket.bind(address)
+
+    def send(self, msg) :
+        self.socket.send_string(msg)
+
+    def finish(self) :
+        self.socket.close()
+        self.context.term()
+
+def run_pub(pkls, address, in_queue, out_queue, timeout = 60) :
     start_time = time.time()
-    context = zmq.Context()
-    socket = context.socket(zmq.PUB)
-    socket.bind(address)
+    pub = pkls(address)
     while time.time() - start_time < timeout :
         msgs = get_all_items_in_queue(in_queue)
         for msg in msgs :
-            socket.send_string(msg_to_raw(msg))
-    socket.close()
-    context.term()
+            pub.send(msg_to_raw(msg))
+    pub.finish()
 
-def run_sub(address, in_queue, out_queue, timeout = 60) :
-    start_time = time.time()
-    context = zmq.Context()
-    socket = context.socket(zmq.SUB)
-    socket.connect(address)
-    socket.subscribe("")
-    poller = zmq.Poller()
-    poller.register(socket, zmq.POLLIN)
-    while time.time() - start_time < timeout :
+class Subscriber(object) :
+    def __init__(self, address) :
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.SUB)
+        self.socket.connect(address)
+        self.socket.subscribe("")
+        self.poller = zmq.Poller()
+        self.poller.register(self.socket, zmq.POLLIN)
+
+    def recv(self) :
         msgs = []
-        if poller.poll(100) :
-            raw = socket.recv_string()
+        if self.poller.poll(100) :
+            raw = self.socket.recv_string()
             msgs.append(raw_to_msg(raw))
+        return msgs
+
+    def finish(self) :
+        self.socket.close()
+        self.context.term()
+
+def run_sub(skls, address, in_queue, out_queue, timeout = 60) :
+    start_time = time.time()
+    sub = skls(address)
+    while time.time() - start_time < timeout :
+        msgs = sub.recv()
         put_items_to_queue(out_queue, items = msgs)
-    socket.close()
-    context.term()
+    sub.finish()
 
 class Monitor(object) :
-    def __init__(self, tkls, qkls, path = None) :
-        self.tkls = tkls
-        self.qkls = qkls
+    def __init__(self, tkls, qkls, pkls = Publisher, skls = Subscriber, path = None) :
+        self.tkls, self.qkls, self.pkls, self.skls = tkls, qkls, pkls, skls
         self.logger = Logger(path = path)
         self.running = False
 
@@ -142,8 +162,8 @@ class Monitor(object) :
         for agent in agents :
             for key, qkls, tkls, first, target in [
                 (agent.id, self.qkls, self.tkls, agent, run_agent),
-                (agent.pub, self.qkls, self.tkls, agent.pub, run_pub),
-                (agent.sub, self.qkls, self.tkls, agent.sub, run_sub),
+                (agent.pub, self.qkls, self.tkls, agent.pub, functools.partial(run_pub, self.pkls)),
+                (agent.sub, self.qkls, self.tkls, agent.sub, functools.partial(run_sub, self.skls)),
             ] :
                 if key is not None :
                     if key not in in_queues.keys() :
@@ -197,11 +217,13 @@ class Monitor(object) :
 
 
 class ProcessMonitor(Monitor) :
-    def __init__(self, path = None) :
-        super(ProcessMonitor, self).__init__(tkls = multiprocessing.Process,
-                                             qkls = multiprocessing.Queue, path = path)
+    def __init__(self, pkls = Publisher, skls = Subscriber, path = None) :
+        super(ProcessMonitor, self).__init__(
+            tkls = multiprocessing.Process, qkls = multiprocessing.Queue,
+            pkls = pkls, skls = skls, path = path)
 
 class ThreadMonitor(Monitor) :
-    def __init__(self, path = None) :
-        super(ThreadMonitor, self).__init__(tkls = threading.Thread,
-                                            qkls = queue.Queue, path = path)
+    def __init__(self, pkls = Publisher, skls = Subscriber, path = None) :
+        super(ThreadMonitor, self).__init__(
+            tkls = threading.Thread, qkls = queue.Queue,
+            pkls = pkls, skls = skls, path = path)
